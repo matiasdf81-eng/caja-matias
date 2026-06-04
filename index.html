@@ -1219,14 +1219,30 @@ function setSyncState(state, msg) {
 async function syncToSheets(data, action) {
   setSyncState('syncing');
   try {
-    await fetch(SCRIPT_URL, {
-      method: 'POST', mode: 'no-cors',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({action: action || 'append', suc, movs: data})
-    });
+    // Send via GET with chunked JSON to avoid CORS POST restrictions
+    const CHUNK = 200;
+    const payload = {action: action || 'append', suc, movs: data};
+    const chunks = [];
+    const movs = data || [];
+    
+    if (movs.length === 0) {
+      // Just send action with empty movs
+      const url = SCRIPT_URL + '?write=1&payload=' + encodeURIComponent(JSON.stringify({action: action||'append', suc, movs:[]}));
+      await fetch(url, {mode:'cors'});
+    } else {
+      // Send first chunk with action, rest as append
+      for (let i=0; i<movs.length; i+=CHUNK) {
+        const chunk = movs.slice(i, i+CHUNK);
+        const act   = (i===0) ? (action||'append') : 'append_chunk';
+        const p     = JSON.stringify({action:act, suc, movs:chunk, total:movs.length, offset:i});
+        const url   = SCRIPT_URL + '?write=1&payload=' + encodeURIComponent(p);
+        await fetch(url, {mode:'cors'});
+      }
+    }
     setSyncState('ok', '☁️ Guardado en Google Sheets');
   } catch(e) {
     setSyncState('error', '⚠️ Sin conexión — datos guardados localmente');
+    console.error('Sync error:', e);
   }
 }
 

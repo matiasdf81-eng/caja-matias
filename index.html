@@ -775,55 +775,36 @@ function setSyncState(state, msg=''){
   if(msg){ lbl.textContent=msg; lbl.className='sync-status vis'; setTimeout(()=>lbl.className='sync-status',3000); }
 }
 
-async function syncToSheets(data,action){
-  if(!data||data.length===0) return;
-  const CHUNK=10;
-  const items=Array.isArray(data)?data:[data];
-  setSyncState('syncing');
-  let ok=false;
-  // Try 1: GET with no-cors (fire and forget — works from GitHub Pages)
-  try{
-    for(let i=0;i<items.length;i+=CHUNK){
-      const chunk=items.slice(i,i+CHUNK);
-      const p={action:i===0?(action||'append'):'append_chunk',suc,movs:chunk};
-      const url=SCRIPT_URL+'?write=1&payload='+encodeURIComponent(JSON.stringify(p));
-      await fetch(url,{mode:'no-cors'});
-    }
-    ok=true;
-  } catch(e){ console.log('Sync attempt failed:',e.message); }
-  if(ok){
-    setSyncState('ok','☁️ Enviado a Google Sheets');
-    // Clear pending queue
-    localStorage.removeItem('pm_pending_'+suc);
-  } else {
-    // Save to pending queue for retry
-    const pending=JSON.parse(localStorage.getItem('pm_pending_'+suc)||'[]');
-    items.forEach(m=>{ if(!pending.find(p=>p.id===m.id)) pending.push(m); });
-    localStorage.setItem('pm_pending_'+suc, JSON.stringify(pending));
-    setSyncState('error','⚠️ Sin conexión — se enviará al sincronizar');
-  }
+function syncToSheets(data, action) {
+  if (!data || data.length === 0) return;
+  const items = Array.isArray(data) ? data : [data];
+  // Save to pending queue
+  const pending = JSON.parse(localStorage.getItem('pm_pending_' + suc) || '[]');
+  items.forEach(function(m) {
+    if (!pending.find(function(p){ return p.id === m.id; })) pending.push(m);
+  });
+  localStorage.setItem('pm_pending_' + suc, JSON.stringify(pending));
+  setSyncState('', '💾 Guardado local — presiona Sync para enviar');
 }
 
-async function flushPending(){
-  const pending=JSON.parse(localStorage.getItem('pm_pending_'+suc)||'[]');
-  if(!pending.length) return;
-  setSyncState('syncing');
-  try{
-    const CHUNK=10;
-    for(let i=0;i<pending.length;i+=CHUNK){
-      const chunk=pending.slice(i,i+CHUNK);
-      const p={action:'append_chunk',suc,movs:chunk};
-      const url=SCRIPT_URL+'?write=1&payload='+encodeURIComponent(JSON.stringify(p));
-      await fetch(url,{mode:'no-cors'});
-    }
-    localStorage.removeItem('pm_pending_'+suc);
-    setSyncState('ok','☁️ '+pending.length+' registros enviados');
-    return true;
-  } catch(e){
-    setSyncState('error','⚠️ Sin conexión');
-    return false;
-  }
+function sendViaForm(payload) {
+  // Create hidden form that POSTs to Apps Script — bypasses CORS
+  const form = document.createElement('form');
+  form.method = 'POST';
+  form.action = SCRIPT_URL;
+  form.target = 'hidden-sync-frame';
+  form.style.display = 'none';
+  const input = document.createElement('input');
+  input.type = 'hidden';
+  input.name = 'payload';
+  input.value = payload;
+  form.appendChild(input);
+  document.body.appendChild(form);
+  form.submit();
+  setTimeout(function(){ document.body.removeChild(form); }, 3000);
 }
+
+
 
 async function pullFromSheets(s,returnData){
   try{
@@ -857,21 +838,29 @@ async function pullFromSheets(s,returnData){
 
 async function forceSyncToSheets(){
   setSyncState('syncing');
-  // First flush any pending local entries
   const pending=JSON.parse(localStorage.getItem('pm_pending_'+suc)||'[]');
   if(pending.length>0){
-    toast('☁️ Enviando '+pending.length+' registros pendientes...','');
-    await flushPending();
-    await new Promise(r=>setTimeout(r,2000)); // wait for Sheets to process
+    toast('☁️ Enviando '+pending.length+' pendientes...','');
+    // Send via form POST in chunks of 10
+    const CHUNK=10;
+    for(let i=0;i<pending.length;i+=CHUNK){
+      const chunk=pending.slice(i,i+CHUNK);
+      const p={action:i===0?'append':'append_chunk',suc,movs:chunk};
+      sendViaForm(JSON.stringify(p));
+      await new Promise(r=>setTimeout(r,1500));
+    }
+    localStorage.removeItem('pm_pending_'+suc);
+    setSyncState('ok','☁️ '+pending.length+' registros enviados');
+    toast('✅ Enviados — actualizando...','ok');
+    await new Promise(r=>setTimeout(r,3000));
   }
-  // Then pull latest from Sheets
-  toast('🔄 Actualizando desde Google Sheets...','');
+  // Pull latest from Sheets
   const d=await pullFromSheets(suc,true);
   if(d&&d.length>0){
     movs=d; setMovsLocal(suc,movs); updSaldos(); render();
-    toast('✅ '+d.length+' registros cargados','ok');
+    toast('✅ '+d.length+' registros en Sheets','ok');
   } else {
-    toast('Sheets sin datos — usando datos locales','');
+    toast('Usando datos locales','');
     setSyncState('','');
   }
 }
@@ -1315,5 +1304,7 @@ function toast(msg,type){ const t=document.getElementById('toast'); t.textConten
 <button class="ep-cancel" onclick="closeEditPanel()">Cancelar</button>
 <button class="ep-save" onclick="epSave()">Guardar</button>
 </div></div>
+
+<iframe name="hidden-sync-frame" style="display:none"></iframe>
 </body>
 </html>

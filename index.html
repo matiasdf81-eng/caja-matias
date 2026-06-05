@@ -830,13 +830,12 @@ async function pullFromSheets(s,returnData){
     const resp=await fetch(SCRIPT_URL+'?suc='+s+'&_='+Date.now());
     const data=await resp.json();
     if(data.ok && data.movs && data.movs.length>0){
-      // Merge: Sheets is source of truth, keep local-only entries not in Sheets
-      // Normalize cuenta field from Sheets (may be 'Efectivo'/'Caja chica')
       const normMovs=data.movs.map(m=>({
         ...m,
         cuenta: String(m.cuenta||'').toLowerCase().includes('chica')?'chica':'efectivo',
         monto: parseFloat(m.monto)||0
-      }));
+      })).sort((a,b)=>b.fecha.localeCompare(a.fecha)||(b.id-a.id));
+      if(returnData) return normMovs;
       const sheetsKeys=new Set(normMovs.map(m=>String(m.id)));
       const localOnly=movs.filter(m=>!sheetsKeys.has(String(m.id)));
       const merged=[...localOnly,...normMovs].sort((a,b)=>b.fecha.localeCompare(a.fecha)||(b.id-a.id));
@@ -844,10 +843,15 @@ async function pullFromSheets(s,returnData){
       updSaldos(); render();
       setSyncState('ok','☁️ Sincronizado');
       if(localOnly.length>0) syncToSheets(localOnly,'append');
+      return movs;
     }
+    if(returnData) return null;
+    return null;
   } catch(e){
-    // Offline - use local
+    console.log('pullFromSheets error:',e.message);
     setSyncState('','');
+    if(returnData) return null;
+    return null;
   }
 }
 

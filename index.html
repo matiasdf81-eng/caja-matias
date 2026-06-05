@@ -549,6 +549,7 @@ body{font-family:'Inter',sans-serif;background:var(--g50);color:var(--g900);font
         <option value="transferencia">Transferencias</option>
       </select>
       <button class="btn-act admin-only" onclick="exportCSV()">⬇ CSV</button>
+      <button class="btn-act admin-only" onclick="exportYSync()" style="background:var(--teal);color:#fff;border-color:var(--teal)" title="Exporta CSV, luego súbelo a Drive y ejecuta cargarDesdeCSV">📤 Exportar y Sync</button>
       <button class="btn-act admin-only"><label style="cursor:pointer">⬆ DEFTER<input type="file" accept=".xlsx" onchange="importDEFTER(event)" style="display:none"></label></button>
       <button class="btn-act admin-only" onclick="forceSyncToSheets()" title="Sincronizar con Google Sheets">☁️ Sync</button>
       <button class="btn-act danger admin-only" onclick="openClear()">🗑</button>
@@ -1112,6 +1113,25 @@ function confirmClear(){ movs=[]; setMovsLocal(suc,movs); closeModal(); updSaldo
 
 
 
+
+
+function exportYSync() {
+  // Step 1: export CSV
+  exportCSV();
+  // Step 2: show instructions
+  setTimeout(function() {
+    const pending = JSON.parse(localStorage.getItem('pm_pending_' + suc) || '[]');
+    const msg = '✅ CSV descargado con ' + movs.length + ' registros'
+      + (pending.length > 0 ? ' (' + pending.length + ' nuevos pendientes)' : '') + '.\n\n'
+      + 'Pasos para sincronizar con Google Sheets:\n'
+      + '1. Sube este CSV a Google Drive\n'
+      + '2. Abre Apps Script (caja panaderia matias)\n'
+      + '3. Selecciona cargarDesdeCSV\n'
+      + '4. Clic en ▶ Ejecutar\n\n'
+      + 'El Sheet quedará actualizado con todos tus registros.';
+    alert(msg);
+  }, 500);
+}
 
 function filtrarTipo(val) {
   const sel = document.getElementById('f-tipo');

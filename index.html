@@ -110,10 +110,10 @@ body{font-family:'Inter',sans-serif;background:var(--g50);color:var(--g900);font
 .inact-banner.vis{display:block}
 
 /* ── LAYOUT ── */
-.layout{display:grid;grid-template-columns:340px 1fr;min-height:calc(100vh - 55px)}
+.layout{display:grid;grid-template-columns:340px 1fr;height:calc(100vh - 55px);overflow:hidden}
 .sidebar{background:var(--wh);border-right:1px solid var(--g200);padding:20px 16px;
-  overflow-y:auto;position:sticky;top:55px;max-height:calc(100vh - 55px)}
-.main{padding:20px 24px;overflow-y:auto;max-height:calc(100vh - 55px)}
+  overflow-y:auto;height:100%;box-sizing:border-box}
+.main{padding:20px 24px;overflow-y:auto;height:100%;box-sizing:border-box}
 
 /* ── SALDO BANNER ── */
 .saldo-banner{background:var(--teal);color:#fff;border-radius:var(--r);padding:14px 16px;margin-bottom:16px}
@@ -788,9 +788,15 @@ async function pullFromSheets(s,returnData){
     const data=await resp.json();
     if(data.ok && data.movs && data.movs.length>0){
       // Merge: Sheets is source of truth, keep local-only entries not in Sheets
-      const sheetsKeys=new Set(data.movs.map(m=>String(m.id)));
+      // Normalize cuenta field from Sheets (may be 'Efectivo'/'Caja chica')
+      const normMovs=data.movs.map(m=>({
+        ...m,
+        cuenta: String(m.cuenta||'').toLowerCase().includes('chica')?'chica':'efectivo',
+        monto: parseFloat(m.monto)||0
+      }));
+      const sheetsKeys=new Set(normMovs.map(m=>String(m.id)));
       const localOnly=movs.filter(m=>!sheetsKeys.has(String(m.id)));
-      const merged=[...localOnly,...data.movs].sort((a,b)=>b.fecha.localeCompare(a.fecha)||(b.id-a.id));
+      const merged=[...localOnly,...normMovs].sort((a,b)=>b.fecha.localeCompare(a.fecha)||(b.id-a.id));
       movs=merged; setMovsLocal(s,movs);
       updSaldos(); render();
       setSyncState('ok','☁️ Sincronizado');
@@ -893,8 +899,8 @@ function calcSaldos(){
 function updSaldos(){
   const {ef,cc}=calcSaldos();
   const fv=parseFloat(document.getElementById('fb-inp').value)||0;
-  document.getElementById('mini-ef').textContent='$'+fmtS(ef);
-  document.getElementById('mini-cc').textContent='$'+fmtS(cc);
+  document.getElementById('mini-ef').textContent='$'+fmt(ef);
+  document.getElementById('mini-cc').textContent='$'+fmt(cc);
   document.getElementById('bn-amt').textContent='$'+fmt(ef+cc);
   const pct=fv>0?Math.min(cc/fv*100,100):0;
   document.getElementById('fb-fill').style.width=Math.max(0,pct)+'%';
@@ -958,7 +964,7 @@ function render(){
     const tl=m.tipo==='ingreso'?'INGRESOS':m.tipo==='gasto'?'GASTOS':'TRANSFER.';
     const sgn=m.tipo==='ingreso'?'+':'−';
     const saldo=sm[m.id]??0;
-    const ctaL=m.cuenta==='efectivo'?'Efectivo':'Caja chica';
+    const ctaL=m.cuenta==='efectivo'?'efectivo':'chica';
     const catB=m.cat==='SALDO INICIAL'?'<span class="badge" style="background:#FFF9C4;color:#795548;border-color:#D7CCC8">APERTURA</span>':`<span class="badge bc">${esc(m.cat)}</span>`;
     const delBtn=currentLevel==='admin'?`<button class="btn-del" onclick="del(${m.id})">✕</button>`:'';
     return `<div class="tx-row clickable ${editingId==m.id?"sel-row":""}" onclick="openEditPanel(${m.id})">
@@ -976,7 +982,7 @@ function render(){
 // ══ DELETE ══
 function del(id){
   movs=movs.filter(m=>m.id!==id);
-  setMovsLocal(suc,movs); syncToSheets(movs,'sync');
+  setMovsLocal(suc,movs);
   updSaldos(); render(); toast('Eliminado','');
 }
 
@@ -1102,14 +1108,14 @@ function epSave(){
   if(!cat)return toast('Categoria requerida','err');
   if(!monto||monto<=0)return toast('Importe invalido','err');
   movs[idx]={...movs[idx],fecha,tipo:epTipo,cuenta:epCuenta,cat,desc:desc||cat,monto,resp};
-  save(); syncToSheets([movs[idx]],'append_chunk');
+  setMovsLocal(suc,movs); syncToSheets([movs[idx]],'append_chunk');
   closeEditPanel(); updSaldos(); render();
   toast('Transaccion actualizada','ok');
 }
 function epDel(){
   if(!editingId)return;
   movs=movs.filter(m=>m.id!=editingId);
-  save(); closeEditPanel(); updSaldos(); render();
+  setMovsLocal(suc,movs); closeEditPanel(); updSaldos(); render();
   toast('Eliminado','');
 }
 

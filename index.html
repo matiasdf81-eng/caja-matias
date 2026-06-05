@@ -110,10 +110,10 @@ body{font-family:'Inter',sans-serif;background:var(--g50);color:var(--g900);font
 .inact-banner.vis{display:block}
 
 /* ── LAYOUT ── */
-.layout{display:grid;grid-template-columns:340px 1fr;height:calc(100vh - 55px);overflow:hidden}
-.sidebar{background:var(--wh);border-right:1px solid var(--g200);padding:20px 16px;
-  overflow-y:auto;height:100%;box-sizing:border-box}
-.main{padding:20px 24px;overflow-y:auto;height:100%;box-sizing:border-box}
+.layout{display:grid;grid-template-columns:340px 1fr;min-height:calc(100vh - 55px)}
+.sidebar{background:var(--wh);border-right:1px solid var(--g200);padding:20px 16px 40px 16px;
+  overflow-y:auto;position:sticky;top:55px;max-height:calc(100vh - 55px)}
+.main{padding:20px 24px;overflow-y:auto;max-height:calc(100vh - 55px);position:sticky;top:55px}
 
 /* ── SALDO BANNER ── */
 .saldo-banner{background:var(--teal);color:#fff;border-radius:var(--r);padding:14px 16px;margin-bottom:16px}
@@ -370,6 +370,17 @@ body{font-family:'Inter',sans-serif;background:var(--g50);color:var(--g900);font
 .edit-dimmer{display:none;position:fixed;inset:0;background:rgba(26,37,51,.25);z-index:799}
 .edit-dimmer.open{display:block}
 
+
+.sb-mini{transition:background .15s;border-radius:var(--rs)}
+.sb-mini:hover{background:rgba(255,255,255,.25)!important}
+.sb-mini.active-filter{background:rgba(255,255,255,.35)!important;box-shadow:0 0 0 2px rgba(255,255,255,.6)}
+
+
+.sc{transition:all .15s}
+.sc:hover{box-shadow:var(--shm);transform:translateY(-1px)}
+.sc.active-filter{box-shadow:0 0 0 2px var(--teal);transform:translateY(-1px)}
+.sc.active-filter-e{box-shadow:0 0 0 2px var(--egr-fg);transform:translateY(-1px)}
+
 </style>
 </head>
 <body>
@@ -452,8 +463,8 @@ body{font-family:'Inter',sans-serif;background:var(--g50);color:var(--g900);font
     <div class="sb-amt" id="bn-amt">$0.00</div>
     <div class="sb-sub">Saldo · <span id="bn-suc">Ensenada</span></div>
     <div class="sb-row">
-      <div class="sb-mini"><div class="sb-mini-l">Efectivo</div><div class="sb-mini-v" id="mini-ef">$0</div></div>
-      <div class="sb-mini"><div class="sb-mini-l">Caja chica</div><div class="sb-mini-v" id="mini-cc">$0</div></div>
+      <div class="sb-mini" onclick="filtrarCuenta('efectivo')" style="cursor:pointer" title="Ver solo Efectivo"><div class="sb-mini-l">Efectivo</div><div class="sb-mini-v" id="mini-ef">$0</div></div>
+      <div class="sb-mini" onclick="filtrarCuenta('chica')" style="cursor:pointer" title="Ver solo Caja chica"><div class="sb-mini-l">Caja chica</div><div class="sb-mini-v" id="mini-cc">$0</div></div>
     </div>
   </div>
   <div class="fondo-box">
@@ -517,12 +528,12 @@ body{font-family:'Inter',sans-serif;background:var(--g50);color:var(--g900);font
       <div style="font-size:11px;color:var(--g400);margin-top:2px" id="main-sub">Ensenada · Google Sheets conectado</div>
     </div>
     <div class="hs-actions">
-      <select class="fsel" id="f-vista" onchange="render()">
+      <select class="fsel" id="f-vista" oninput="render()" onchange="render()">
         <option value="todas">Todas las cuentas</option>
         <option value="efectivo">💵 Efectivo</option>
         <option value="chica">🪙 Caja chica</option>
       </select>
-      <select class="fsel" id="f-mes" onchange="render()">
+      <select class="fsel" id="f-mes" oninput="render()" onchange="render()">
         <option value="">Todos los meses</option>
         <option value="1">Enero</option><option value="2">Febrero</option>
         <option value="3">Marzo</option><option value="4">Abril</option>
@@ -531,7 +542,7 @@ body{font-family:'Inter',sans-serif;background:var(--g50);color:var(--g900);font
         <option value="9">Septiembre</option><option value="10">Octubre</option>
         <option value="11">Noviembre</option><option value="12">Diciembre</option>
       </select>
-      <select class="fsel" id="f-tipo" onchange="render()">
+      <select class="fsel" id="f-tipo" oninput="render()" onchange="render()">
         <option value="">Todos los tipos</option>
         <option value="ingreso">Ingresos</option>
         <option value="gasto">Gastos</option>
@@ -544,9 +555,9 @@ body{font-family:'Inter',sans-serif;background:var(--g50);color:var(--g900);font
     </div>
   </div>
   <div class="stats">
-    <div class="sc"><div class="sc-lbl">Ingresos</div><div class="sc-val i" id="st-ing">$0.00</div><div class="sc-sub" id="st-ing-n">0 transacciones</div></div>
-    <div class="sc"><div class="sc-lbl">Gastos</div><div class="sc-val e" id="st-egr">$0.00</div><div class="sc-sub" id="st-egr-n">0 transacciones</div></div>
-    <div class="sc"><div class="sc-lbl">Balance</div><div class="sc-val b" id="st-bal">$0.00</div><div class="sc-sub" id="st-bal-s">Período seleccionado</div></div>
+    <div class="sc" onclick="filtrarTipo('ingreso')" id="card-ing" style="cursor:pointer" title="Ver solo Ingresos"><div class="sc-lbl">Ingresos</div><div class="sc-val i" id="st-ing">$0.00</div><div class="sc-sub" id="st-ing-n">0 transacciones</div></div>
+    <div class="sc" onclick="filtrarTipo('gasto')" id="card-egr" style="cursor:pointer" title="Ver solo Gastos"><div class="sc-lbl">Gastos</div><div class="sc-val e" id="st-egr">$0.00</div><div class="sc-sub" id="st-egr-n">0 transacciones</div></div>
+    <div class="sc" onclick="filtrarTipo('')" id="card-bal" style="cursor:pointer" title="Ver todos"><div class="sc-lbl">Balance</div><div class="sc-val b" id="st-bal">$0.00</div><div class="sc-sub" id="st-bal-s">Período seleccionado</div></div>
   </div>
   <div class="mbar" id="mbar" style="display:none">
     <span style="font-size:11px;font-weight:700;color:var(--teal-d)" id="mbar-lbl"></span>
@@ -1052,6 +1063,38 @@ function openClear(){ if(!movs.length)return toast('No hay datos',''); document.
 function closeModal(){ document.getElementById('modal').className='overlay'; }
 function confirmClear(){ movs=[]; setMovsLocal(suc,movs); closeModal(); updSaldos(); render(); toast('Limpiado',''); }
 
+
+
+
+function filtrarTipo(val) {
+  const sel = document.getElementById('f-tipo');
+  // Toggle
+  sel.value = (sel.value === val) ? '' : val;
+  // Update card highlights
+  const ci = document.getElementById('card-ing');
+  const ce = document.getElementById('card-egr');
+  const cb = document.getElementById('card-bal');
+  if (ci) ci.className = 'sc' + (sel.value === 'ingreso' ? ' active-filter' : '');
+  if (ce) ce.className = 'sc' + (sel.value === 'gasto' ? ' active-filter-e' : '');
+  if (cb) cb.className = 'sc' + (sel.value === '' ? '' : '');
+  render();
+}
+
+function filtrarCuenta(val) {
+  const sel = document.getElementById('f-vista');
+  // Toggle: if already filtered by this, show all
+  if (sel.value === val) {
+    sel.value = 'todas';
+  } else {
+    sel.value = val;
+  }
+  // Update card highlight
+  document.getElementById('mini-ef').closest('.sb-mini').className = 
+    'sb-mini' + (sel.value === 'efectivo' ? ' active-filter' : '');
+  document.getElementById('mini-cc').closest('.sb-mini').className = 
+    'sb-mini' + (sel.value === 'chica' ? ' active-filter' : '');
+  render();
+}
 
 // EDIT PANEL
 const EP_C={

@@ -841,26 +841,40 @@ async function forceSyncToSheets(){
   const pending=JSON.parse(localStorage.getItem('pm_pending_'+suc)||'[]');
   if(pending.length>0){
     toast('☁️ Enviando '+pending.length+' pendientes...','');
-    // Send via form POST in chunks of 10
     const CHUNK=10;
+    let sent=0;
     for(let i=0;i<pending.length;i+=CHUNK){
       const chunk=pending.slice(i,i+CHUNK);
       const p={action:i===0?'append':'append_chunk',suc,movs:chunk};
-      sendViaForm(JSON.stringify(p));
-      await new Promise(r=>setTimeout(r,1500));
+      const payload=JSON.stringify(p);
+      // Try FormData POST (avoids CORS preflight)
+      try{
+        const fd=new FormData();
+        fd.append('payload',payload);
+        await fetch(SCRIPT_URL,{method:'POST',body:fd,mode:'no-cors'});
+        sent+=chunk.length;
+      } catch(e){
+        // Fallback: GET no-cors
+        try{
+          const url=SCRIPT_URL+'?write=1&payload='+encodeURIComponent(payload);
+          await fetch(url,{mode:'no-cors'});
+          sent+=chunk.length;
+        } catch(e2){ console.log('Send failed',e2); }
+      }
+      await new Promise(r=>setTimeout(r,800));
     }
     localStorage.removeItem('pm_pending_'+suc);
-    setSyncState('ok','☁️ '+pending.length+' registros enviados');
-    toast('✅ Enviados — actualizando...','ok');
-    await new Promise(r=>setTimeout(r,3000));
+    setSyncState('ok','☁️ Enviados');
+    toast('✅ '+sent+' enviados — verificando en Sheets...','ok');
+    await new Promise(r=>setTimeout(r,4000));
   }
   // Pull latest from Sheets
   const d=await pullFromSheets(suc,true);
   if(d&&d.length>0){
     movs=d; setMovsLocal(suc,movs); updSaldos(); render();
-    toast('✅ '+d.length+' registros en Sheets','ok');
+    toast('✅ '+d.length+' registros cargados','ok');
   } else {
-    toast('Usando datos locales','');
+    toast('Sin respuesta de Sheets — datos locales OK','');
     setSyncState('','');
   }
 }
